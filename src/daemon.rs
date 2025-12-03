@@ -351,30 +351,40 @@ async fn handle_proxy_request(
             }
         }
         None => {
-            // List available services
+            // Show dashboard for localhost, 404 for unknown domains
             let reg = registry.read().await;
             let services = reg.list();
-            let available = services
-                .iter()
-                .map(|s| format!("  - http://{}", s.domain))
-                .collect::<Vec<_>>()
-                .join("\n");
 
-            let body = format!(
-                "unport: Domain '{}' not found.\n\nAvailable services:\n{}",
-                domain,
-                if available.is_empty() {
-                    "  (none)".to_string()
-                } else {
-                    available
-                }
-            );
+            if domain == "localhost" || domain == "127.0.0.1" {
+                let html = render_dashboard(&services);
+                Ok(Response::builder()
+                    .status(200)
+                    .header("content-type", "text/html; charset=utf-8")
+                    .body(Full::new(Bytes::from(html)))
+                    .unwrap())
+            } else {
+                let available = services
+                    .iter()
+                    .map(|s| format!("  - http://{}", s.domain))
+                    .collect::<Vec<_>>()
+                    .join("\n");
 
-            Ok(Response::builder()
-                .status(404)
-                .header("content-type", "text/plain")
-                .body(Full::new(Bytes::from(body)))
-                .unwrap())
+                let body = format!(
+                    "unport: Domain '{}' not found.\n\nAvailable services:\n{}",
+                    domain,
+                    if available.is_empty() {
+                        "  (none)".to_string()
+                    } else {
+                        available
+                    }
+                );
+
+                Ok(Response::builder()
+                    .status(404)
+                    .header("content-type", "text/plain")
+                    .body(Full::new(Bytes::from(body)))
+                    .unwrap())
+            }
         }
     }
 }
@@ -404,4 +414,212 @@ async fn forward_request(
     let body_bytes = body.collect().await?.to_bytes();
 
     Ok(Response::from_parts(parts, Full::new(body_bytes)))
+}
+
+fn render_dashboard(services: &[Service]) -> String {
+    let service_rows = if services.is_empty() {
+        r#"<tr><td colspan="4" class="empty">No services running. Start one with <code>unport start</code></td></tr>"#.to_string()
+    } else {
+        services
+            .iter()
+            .map(|s| {
+                let url = format!("http://{}", s.domain);
+                let status = if is_process_alive(s.pid) { "running" } else { "stopped" };
+                let status_class = if is_process_alive(s.pid) { "status-running" } else { "status-stopped" };
+                format!(
+                    r#"<tr>
+                        <td><span class="status-dot {}"></span>{}</td>
+                        <td class="url">{}</td>
+                        <td>{}</td>
+                        <td class="actions">
+                            <button class="btn btn-copy" onclick="copyToClipboard('{}')">Copy</button>
+                            <a href="{}" class="btn btn-go" target="_blank">Open</a>
+                        </td>
+                    </tr>"#,
+                    status_class, status, url, s.port, url, url
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    format!(
+        r##"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unport - Local Development Services</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0a0a0a;
+            color: #e5e5e5;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }}
+        .container {{
+            max-width: 800px;
+            margin: 0 auto;
+        }}
+        header {{
+            margin-bottom: 40px;
+        }}
+        h1 {{
+            font-size: 28px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+        }}
+        .subtitle {{
+            color: #666;
+            font-size: 14px;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: #141414;
+            border-radius: 8px;
+            overflow: hidden;
+        }}
+        th {{
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #222;
+        }}
+        td {{
+            padding: 16px;
+            border-bottom: 1px solid #1a1a1a;
+            font-size: 14px;
+        }}
+        tr:last-child td {{
+            border-bottom: none;
+        }}
+        tr:hover {{
+            background: #1a1a1a;
+        }}
+        .url {{
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            color: #3b82f6;
+        }}
+        .status-dot {{
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }}
+        .status-running {{
+            background: #22c55e;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+        }}
+        .status-stopped {{
+            background: #ef4444;
+        }}
+        .actions {{
+            display: flex;
+            gap: 8px;
+        }}
+        .btn {{
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-decoration: none;
+            border: none;
+        }}
+        .btn-copy {{
+            background: #222;
+            color: #e5e5e5;
+            border: 1px solid #333;
+        }}
+        .btn-copy:hover {{
+            background: #333;
+            border-color: #444;
+        }}
+        .btn-go {{
+            background: #3b82f6;
+            color: #fff;
+        }}
+        .btn-go:hover {{
+            background: #2563eb;
+        }}
+        .empty {{
+            text-align: center;
+            color: #666;
+            padding: 40px 16px;
+        }}
+        code {{
+            background: #222;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 13px;
+        }}
+        .toast {{
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #22c55e;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }}
+        .toast.show {{
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>unport</h1>
+            <p class="subtitle">Local Development Services</p>
+        </header>
+        <table>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>URL</th>
+                    <th>Port</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {}
+            </tbody>
+        </table>
+    </div>
+    <div class="toast" id="toast">Copied to clipboard</div>
+    <script>
+        function copyToClipboard(text) {{
+            navigator.clipboard.writeText(text).then(() => {{
+                const toast = document.getElementById('toast');
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2000);
+            }});
+        }}
+    </script>
+</body>
+</html>"##,
+        service_rows
+    )
 }
