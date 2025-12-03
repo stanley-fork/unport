@@ -393,8 +393,11 @@ async fn forward_request(
     req: Request<Incoming>,
     port: u16,
 ) -> Result<Response<Full<Bytes>>> {
-    let addr = format!("127.0.0.1:{}", port);
-    let stream = TcpStream::connect(&addr).await?;
+    // Try localhost (which resolves to IPv4 or IPv6) first, then fallback to 127.0.0.1
+    let stream = match TcpStream::connect(format!("localhost:{}", port)).await {
+        Ok(s) => s,
+        Err(_) => TcpStream::connect(format!("127.0.0.1:{}", port)).await?,
+    };
     let io = TokioIo::new(stream);
 
     let (mut sender, conn) = hyper::client::conn::http1::handshake(io).await?;
