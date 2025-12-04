@@ -3,6 +3,7 @@ mod config;
 mod daemon;
 mod detect;
 mod process;
+mod proxy;
 mod types;
 
 use clap::{Parser, Subcommand};
