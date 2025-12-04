@@ -20,7 +20,7 @@ cargo install --path .
 
 ```bash
 # 1. Start the daemon (needs sudo for port 80)
-sudo unport daemon
+sudo unport daemon start -d
 
 # 2. In your project directory, create unport.json
 echo '{"domain": "myapp"}' > unport.json
@@ -206,12 +206,36 @@ VITE_API_URL=http://api.localhost
 
 ## Commands
 
-### `unport daemon`
+### `unport daemon start`
 
-Start the background daemon. Requires `sudo` for port 80.
+Start the daemon. Requires `sudo` for port 80.
 
 ```bash
-sudo unport daemon
+# Start in foreground
+sudo unport daemon start
+
+# Start in background (detached)
+sudo unport daemon start -d
+```
+
+### `unport daemon status`
+
+Check if the daemon is running.
+
+```bash
+$ unport daemon status
+Status: running
+  PID:      12345
+  Uptime:   2h 15m
+  Services: 3
+```
+
+### `unport daemon stop`
+
+Stop the daemon.
+
+```bash
+unport daemon stop
 ```
 
 ### `unport start`
@@ -240,14 +264,6 @@ Stop a service by domain name.
 
 ```bash
 unport stop api
-```
-
-### `unport daemon stop`
-
-Stop the daemon and all services.
-
-```bash
-unport daemon stop
 ```
 
 ## Config Reference

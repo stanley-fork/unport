@@ -18,10 +18,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Start the unport daemon
+    /// Manage the unport daemon
     Daemon {
         #[command(subcommand)]
-        action: Option<DaemonAction>,
+        action: DaemonAction,
     },
     /// Start the app in current directory and register with daemon
     Start,
@@ -36,8 +36,16 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum DaemonAction {
+    /// Start the daemon
+    Start {
+        /// Run daemon in background (detached)
+        #[arg(short = 'd', long = "detach")]
+        detach: bool,
+    },
     /// Stop the daemon
     Stop,
+    /// Show daemon status
+    Status,
 }
 
 #[tokio::main]
@@ -53,8 +61,9 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Daemon { action } => match action {
-            Some(DaemonAction::Stop) => client::stop_daemon().await,
-            None => daemon::run().await,
+            DaemonAction::Start { detach } => daemon::run(detach).await,
+            DaemonAction::Stop => client::stop_daemon().await,
+            DaemonAction::Status => client::daemon_status().await,
         },
         Commands::Start => client::start().await,
         Commands::Stop { domain } => client::stop_service(&domain).await,

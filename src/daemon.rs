@@ -134,7 +134,33 @@ fn is_port_available(port: u16) -> bool {
 type SharedRegistry = Arc<RwLock<Registry>>;
 
 /// Run the daemon
-pub async fn run() -> Result<()> {
+pub async fn run(detach: bool) -> Result<()> {
+    // If detach requested, spawn daemon in background and exit
+    if detach {
+        let exe = std::env::current_exe().context("Failed to get current executable")?;
+
+        // Ensure unport directory exists
+        let dir = unport_dir();
+        std::fs::create_dir_all(&dir).context("Failed to create ~/.unport directory")?;
+
+        // Open log file for daemon output
+        let log_path = dir.join("daemon.log");
+        let log_file = std::fs::File::create(&log_path)
+            .context("Failed to create daemon log file")?;
+        let log_file_err = log_file.try_clone()?;
+
+        std::process::Command::new(exe)
+            .arg("daemon")
+            .stdin(std::process::Stdio::null())
+            .stdout(log_file)
+            .stderr(log_file_err)
+            .spawn()
+            .context("Failed to spawn daemon process")?;
+
+        println!("Daemon started in background. Logs at: {:?}", log_path);
+        return Ok(());
+    }
+
     // Ensure unport directory exists
     let dir = unport_dir();
     std::fs::create_dir_all(&dir).context("Failed to create ~/.unport directory")?;

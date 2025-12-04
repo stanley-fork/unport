@@ -7,7 +7,7 @@ use tracing::{info, warn};
 use crate::config::Config;
 use crate::detect::{detect, PortStrategy};
 use crate::process::spawn_app;
-use crate::types::{socket_path, Request, Response};
+use crate::types::{pid_path, socket_path, Request, Response};
 
 /// Send a request to the daemon and get a response
 fn send_request(request: &Request) -> Result<Response> {
@@ -196,6 +196,81 @@ pub async fn stop_daemon() -> Result<()> {
     Ok(())
 }
 
+/// Show daemon status
+pub async fn daemon_status() -> Result<()> {
+    let pid_file = pid_path();
+
+    // Check if PID file exists
+    if !pid_file.exists() {
+        println!("Status: stopped");
+        println!("  Daemon is not running (no PID file)");
+        return Ok(());
+    }
+
+    // Read PID
+    let pid_str = std::fs::read_to_string(&pid_file)?;
+    let pid: u32 = pid_str.trim().parse().context("Invalid PID file")?;
+
+    // Check if process is alive
+    if !is_process_alive(pid) {
+        println!("Status: stopped");
+        println!("  Daemon is not running (stale PID file, process {} not found)", pid);
+        return Ok(());
+    }
+
+    // Try to connect to daemon
+    let service_count = match send_request(&Request::List) {
+        Ok(Response::Services(services)) => services.len(),
+        Ok(_) => 0,
+        Err(_) => {
+            println!("Status: error");
+            println!("  Process {} is running but daemon is not responding", pid);
+            return Ok(());
+        }
+    };
+
+    // Get uptime from PID file modification time
+    let uptime = if let Ok(metadata) = std::fs::metadata(&pid_file) {
+        if let Ok(created) = metadata.modified() {
+            if let Ok(duration) = created.elapsed() {
+                format_duration(duration)
+            } else {
+                "unknown".to_string()
+            }
+        } else {
+            "unknown".to_string()
+        }
+    } else {
+        "unknown".to_string()
+    };
+
+    println!("Status: running");
+    println!("  PID:      {}", pid);
+    println!("  Uptime:   {}", uptime);
+    println!("  Services: {}", service_count);
+
+    Ok(())
+}
+
+fn format_duration(duration: std::time::Duration) -> String {
+    let secs = duration.as_secs();
+    if secs < 60 {
+        format!("{}s", secs)
+    } else if secs < 3600 {
+        format!("{}m {}s", secs / 60, secs % 60)
+    } else if secs < 86400 {
+        format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
+    } else {
+        format!("{}d {}h", secs / 86400, (secs % 86400) / 3600)
+    }
+}
+
 fn is_process_alive(pid: u32) -> bool {
-    unsafe { libc::kill(pid as i32, 0) == 0 }
+    let result = unsafe { libc::kill(pid as i32, 0) };
+    if result == 0 {
+        return true;
+    }
+    // EPERM means process exists but we can't signal it (e.g., root-owned process)
+    let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+    errno == libc::EPERM
 }
