@@ -151,7 +151,7 @@ pub async fn run(detach: bool) -> Result<()> {
         let log_file_err = log_file.try_clone()?;
 
         std::process::Command::new(exe)
-            .arg("daemon")
+            .args(["daemon", "start"])
             .stdin(std::process::Stdio::null())
             .stdout(log_file)
             .stderr(log_file_err)
