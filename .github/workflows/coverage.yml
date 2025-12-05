@@ -26,6 +26,9 @@ jobs:
           COVERAGE=$(jq '.coverage' tarpaulin-report.json)
           echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
 
+      - name: Create assets directory
+        run: mkdir -p assets
+
       - name: Generate coverage badge
         uses: ozankasikci/rust-test-coverage-badge@v1
         with:
