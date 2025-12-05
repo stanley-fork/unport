@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="assets/banner.jpeg" alt="Unport - Local Port Management Daemon" width="100%">
-</p>
-
-<p align="center">
   <a href="https://crates.io/crates/unport-cli"><img src="https://img.shields.io/crates/v/unport-cli.svg" alt="Crates.io"></a>
   <a href="https://crates.io/crates/unport-cli"><img src="https://img.shields.io/crates/d/unport-cli.svg" alt="Downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/crates/l/unport-cli.svg" alt="License"></a>
   <img src="assets/coverage.svg" alt="Coverage">
+</p>
+
+<p align="center">
+  <img src="assets/banner.jpeg" alt="Unport - Local Port Management Daemon" width="100%">
 </p>
 
 <p align="center">
