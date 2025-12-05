@@ -12,6 +12,7 @@ Local development port manager. Access your apps via clean domains like `http://
 - [Quick Start](#quick-start)
 - [How It Works](#how-it-works)
 - [Commands](#commands)
+- [HTTPS Support](#https-support)
 - [Config](#config)
 - [License](#license)
 
@@ -68,11 +69,16 @@ The daemon handles all routing. Your apps don't need to know about each other—
 | Command | Description |
 |---------|-------------|
 | `sudo unport daemon start -d` | Start daemon in background |
+| `sudo unport daemon start -d --https` | Start daemon with HTTPS support (ports 80 + 443) |
 | `unport daemon status` | Show daemon status (PID, uptime, services) |
 | `unport daemon stop` | Stop the daemon |
 | `unport start` | Start app in current directory |
 | `unport list` | Show all running services |
 | `unport stop <domain>` | Stop a service |
+| `sudo unport trust-ca` | Add unport CA to system trust store (for HTTPS) |
+| `sudo unport trust-ca --remove` | Remove unport CA from system trust store |
+| `unport clean-certs` | Delete generated TLS certificates |
+| `unport regen-cert` | Regenerate TLS certificate for all domains |
 
 ## Config
 
@@ -103,6 +109,51 @@ const port = process.env.PORT || 3000;
 ```go
 // Go
 port := os.Getenv("PORT")
+```
+
+## HTTPS Support
+
+unport can serve your apps over HTTPS with automatically generated certificates.
+
+### Setup
+
+```bash
+# 1. Start daemon with HTTPS enabled
+sudo unport daemon start -d --https
+
+# 2. Trust the CA certificate (one-time setup)
+sudo unport trust-ca
+
+# 3. Start your app as usual
+unport start
+
+# Your app is now available at both:
+# - http://myapp.localhost
+# - https://myapp.localhost
+```
+
+### How it works
+
+When started with `--https`, unport:
+
+1. Generates a local CA certificate (stored in `~/.unport/ca.crt`)
+2. Creates TLS certificates for `*.localhost` domains
+3. Listens on both port 80 (HTTP) and port 443 (HTTPS)
+4. Automatically updates certificates when new domains are registered
+
+The CA only needs to be trusted once. After that, all `*.localhost` domains will have valid HTTPS.
+
+### Certificate management
+
+```bash
+# Regenerate certificates (e.g., after adding many domains)
+unport regen-cert
+
+# Remove CA from trust store
+sudo unport trust-ca --remove
+
+# Delete all generated certificates
+unport clean-certs
 ```
 
 ## License
