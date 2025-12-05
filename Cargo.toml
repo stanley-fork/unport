@@ -46,5 +46,12 @@ dirs = "5"
 libc = "0.2"
 ctrlc = "3"
 
+# TLS
+rcgen = "0.13"
+tokio-rustls = "0.26"
+rustls-pemfile = "2"
+
 [dev-dependencies]
 tempfile = "3"
+x509-parser = "0.16"
+pem = "3"
