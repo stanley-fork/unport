@@ -2,8 +2,10 @@ mod client;
 mod config;
 mod daemon;
 mod detect;
+mod logger;
 mod process;
 mod proxy;
+mod tls;
 mod types;
 
 use clap::{Parser, Subcommand};
@@ -32,6 +34,16 @@ enum Commands {
     },
     /// List all registered services
     List,
+    /// Add unport CA to system trust store for HTTPS support
+    TrustCa {
+        /// Remove CA from trust store instead of adding
+        #[arg(long)]
+        remove: bool,
+    },
+    /// Delete generated TLS certificates (forces regeneration on next daemon start)
+    CleanCerts,
+    /// Regenerate TLS certificate with SANs for all registered domains
+    RegenCert,
 }
 
 #[derive(Subcommand)]
@@ -41,6 +53,9 @@ enum DaemonAction {
         /// Run daemon in background (detached)
         #[arg(short = 'd', long = "detach")]
         detach: bool,
+        /// Enable HTTPS on port 443
+        #[arg(long)]
+        https: bool,
     },
     /// Stop the daemon
     Stop,
@@ -50,23 +65,21 @@ enum DaemonAction {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
-        )
-        .init();
+    logger::init();
 
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Daemon { action } => match action {
-            DaemonAction::Start { detach } => daemon::run(detach).await,
+            DaemonAction::Start { detach, https } => daemon::run(detach, https).await,
             DaemonAction::Stop => client::stop_daemon().await,
             DaemonAction::Status => client::daemon_status().await,
         },
         Commands::Start => client::start().await,
         Commands::Stop { domain } => client::stop_service(&domain).await,
         Commands::List => client::list().await,
+        Commands::TrustCa { remove } => client::trust_ca(remove).await,
+        Commands::CleanCerts => tls::clean_certs(),
+        Commands::RegenCert => client::regen_cert().await,
     }
 }
