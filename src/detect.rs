@@ -11,7 +11,7 @@ pub struct Detection {
     pub port_strategy: PortStrategy,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum PortStrategy {
     /// Set PORT environment variable
     EnvVar(String),

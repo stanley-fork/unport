@@ -1,29 +1,6 @@
 use std::fs;
-use std::path::Path;
 use tempfile::tempdir;
-
-#[derive(Debug, serde::Deserialize, PartialEq)]
-struct Config {
-    domain: String,
-    start: Option<String>,
-    #[serde(rename = "portEnv")]
-    port_env: Option<String>,
-    #[serde(rename = "portArg")]
-    port_arg: Option<String>,
-}
-
-impl Config {
-    fn load(dir: &Path) -> Result<Self, Box<dyn std::error::Error>> {
-        let config_path = dir.join("unport.json");
-        let content = fs::read_to_string(&config_path)?;
-        let config: Config = serde_json::from_str(&content)?;
-        Ok(config)
-    }
-
-    fn full_domain(&self) -> String {
-        format!("{}.localhost", self.domain)
-    }
-}
+use unport_cli::config::Config;
 
 #[test]
 fn test_load_minimal_config() {
@@ -98,37 +75,31 @@ fn test_load_config_with_port_arg() {
 
 #[test]
 fn test_full_domain() {
-    let config = Config {
-        domain: "myapp".to_string(),
-        start: None,
-        port_env: None,
-        port_arg: None,
-    };
+    let dir = tempdir().unwrap();
+    let config_content = r#"{"domain": "myapp"}"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
 
+    let config = Config::load(dir.path()).unwrap();
     assert_eq!(config.full_domain(), "myapp.localhost");
 }
 
 #[test]
 fn test_full_domain_api() {
-    let config = Config {
-        domain: "api".to_string(),
-        start: None,
-        port_env: None,
-        port_arg: None,
-    };
+    let dir = tempdir().unwrap();
+    let config_content = r#"{"domain": "api"}"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
 
+    let config = Config::load(dir.path()).unwrap();
     assert_eq!(config.full_domain(), "api.localhost");
 }
 
 #[test]
 fn test_full_domain_with_hyphen() {
-    let config = Config {
-        domain: "my-cool-app".to_string(),
-        start: None,
-        port_env: None,
-        port_arg: None,
-    };
+    let dir = tempdir().unwrap();
+    let config_content = r#"{"domain": "my-cool-app"}"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
 
+    let config = Config::load(dir.path()).unwrap();
     assert_eq!(config.full_domain(), "my-cool-app.localhost");
 }
 
@@ -151,7 +122,6 @@ fn test_invalid_json() {
 #[test]
 fn test_missing_required_field() {
     let dir = tempdir().unwrap();
-    // Missing "domain" field
     fs::write(dir.path().join("unport.json"), r#"{"start": "npm run dev"}"#).unwrap();
 
     let result = Config::load(dir.path());
@@ -217,7 +187,7 @@ fn test_domain_with_underscores() {
 #[test]
 fn test_very_long_domain() {
     let dir = tempdir().unwrap();
-    let long_domain = "a".repeat(63); // max DNS label length
+    let long_domain = "a".repeat(63);
     let config_content = format!(r#"{{"domain": "{}"}}"#, long_domain);
     fs::write(dir.path().join("unport.json"), config_content).unwrap();
 
@@ -282,12 +252,10 @@ fn test_port_arg_common_formats() {
 #[test]
 fn test_whitespace_in_domain_preserved() {
     let dir = tempdir().unwrap();
-    // JSON with leading/trailing whitespace in domain value
     let config_content = r#"{"domain": "  myapp  "}"#;
     fs::write(dir.path().join("unport.json"), config_content).unwrap();
 
     let config = Config::load(dir.path()).unwrap();
-    // JSON parsing preserves whitespace in strings
     assert_eq!(config.domain, "  myapp  ");
 }
 
@@ -310,23 +278,8 @@ fn test_null_optional_fields() {
 }
 
 #[test]
-fn test_config_file_with_bom() {
-    let dir = tempdir().unwrap();
-    // UTF-8 BOM + JSON content
-    let mut content = vec![0xEF, 0xBB, 0xBF]; // UTF-8 BOM
-    content.extend_from_slice(br#"{"domain": "app"}"#);
-    fs::write(dir.path().join("unport.json"), content).unwrap();
-
-    // This might fail depending on how the parser handles BOM
-    let result = Config::load(dir.path());
-    // We just check it doesn't panic
-    let _ = result;
-}
-
-#[test]
 fn test_config_with_comments_fails() {
     let dir = tempdir().unwrap();
-    // JSON doesn't support comments
     let config_content = r#"{
         "domain": "app" // this is a comment
     }"#;
