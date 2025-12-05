@@ -192,3 +192,158 @@ fn test_unicode_domain() {
     let config = Config::load(dir.path()).unwrap();
     assert_eq!(config.domain, "my-app-测试");
 }
+
+#[test]
+fn test_domain_with_numbers() {
+    let dir = tempdir().unwrap();
+    let config_content = r#"{"domain": "app123"}"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+    let config = Config::load(dir.path()).unwrap();
+    assert_eq!(config.domain, "app123");
+    assert_eq!(config.full_domain(), "app123.localhost");
+}
+
+#[test]
+fn test_domain_with_underscores() {
+    let dir = tempdir().unwrap();
+    let config_content = r#"{"domain": "my_app"}"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+    let config = Config::load(dir.path()).unwrap();
+    assert_eq!(config.domain, "my_app");
+}
+
+#[test]
+fn test_very_long_domain() {
+    let dir = tempdir().unwrap();
+    let long_domain = "a".repeat(63); // max DNS label length
+    let config_content = format!(r#"{{"domain": "{}"}}"#, long_domain);
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+    let config = Config::load(dir.path()).unwrap();
+    assert_eq!(config.domain.len(), 63);
+}
+
+#[test]
+fn test_start_command_with_args() {
+    let dir = tempdir().unwrap();
+    let config_content = r#"{
+        "domain": "api",
+        "start": "node server.js --env=production --debug"
+    }"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+    let config = Config::load(dir.path()).unwrap();
+    assert_eq!(config.start, Some("node server.js --env=production --debug".to_string()));
+}
+
+#[test]
+fn test_start_command_with_pipes() {
+    let dir = tempdir().unwrap();
+    let config_content = r#"{
+        "domain": "api",
+        "start": "npm run build && npm start"
+    }"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+    let config = Config::load(dir.path()).unwrap();
+    assert!(config.start.unwrap().contains("&&"));
+}
+
+#[test]
+fn test_port_env_common_names() {
+    let common_env_vars = vec!["PORT", "HTTP_PORT", "SERVER_PORT", "APP_PORT", "LISTEN_PORT"];
+
+    for env_var in common_env_vars {
+        let dir = tempdir().unwrap();
+        let config_content = format!(r#"{{"domain": "app", "portEnv": "{}"}}"#, env_var);
+        fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+        let config = Config::load(dir.path()).unwrap();
+        assert_eq!(config.port_env, Some(env_var.to_string()));
+    }
+}
+
+#[test]
+fn test_port_arg_common_formats() {
+    let common_args = vec!["--port", "-p", "-P", "--listen", "--http-port"];
+
+    for arg in common_args {
+        let dir = tempdir().unwrap();
+        let config_content = format!(r#"{{"domain": "app", "portArg": "{}"}}"#, arg);
+        fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+        let config = Config::load(dir.path()).unwrap();
+        assert_eq!(config.port_arg, Some(arg.to_string()));
+    }
+}
+
+#[test]
+fn test_whitespace_in_domain_preserved() {
+    let dir = tempdir().unwrap();
+    // JSON with leading/trailing whitespace in domain value
+    let config_content = r#"{"domain": "  myapp  "}"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+    let config = Config::load(dir.path()).unwrap();
+    // JSON parsing preserves whitespace in strings
+    assert_eq!(config.domain, "  myapp  ");
+}
+
+#[test]
+fn test_null_optional_fields() {
+    let dir = tempdir().unwrap();
+    let config_content = r#"{
+        "domain": "app",
+        "start": null,
+        "portEnv": null,
+        "portArg": null
+    }"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+    let config = Config::load(dir.path()).unwrap();
+    assert_eq!(config.domain, "app");
+    assert_eq!(config.start, None);
+    assert_eq!(config.port_env, None);
+    assert_eq!(config.port_arg, None);
+}
+
+#[test]
+fn test_config_file_with_bom() {
+    let dir = tempdir().unwrap();
+    // UTF-8 BOM + JSON content
+    let mut content = vec![0xEF, 0xBB, 0xBF]; // UTF-8 BOM
+    content.extend_from_slice(br#"{"domain": "app"}"#);
+    fs::write(dir.path().join("unport.json"), content).unwrap();
+
+    // This might fail depending on how the parser handles BOM
+    let result = Config::load(dir.path());
+    // We just check it doesn't panic
+    let _ = result;
+}
+
+#[test]
+fn test_config_with_comments_fails() {
+    let dir = tempdir().unwrap();
+    // JSON doesn't support comments
+    let config_content = r#"{
+        "domain": "app" // this is a comment
+    }"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+    let result = Config::load(dir.path());
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_config_with_trailing_comma_fails() {
+    let dir = tempdir().unwrap();
+    let config_content = r#"{
+        "domain": "app",
+    }"#;
+    fs::write(dir.path().join("unport.json"), config_content).unwrap();
+
+    let result = Config::load(dir.path());
+    assert!(result.is_err());
+}

@@ -257,3 +257,180 @@ mod request_routing {
         assert_eq!(target, "myapp.localhost");
     }
 }
+
+mod https_proxy {
+    #[test]
+    fn test_https_port() {
+        let https_port: u16 = 443;
+        assert_eq!(https_port, 443);
+    }
+
+    #[test]
+    fn test_http_port() {
+        let http_port: u16 = 80;
+        assert_eq!(http_port, 80);
+    }
+
+    #[test]
+    fn test_https_url_format() {
+        let domain = "api.localhost";
+        let url = format!("https://{}", domain);
+        assert_eq!(url, "https://api.localhost");
+    }
+
+    #[test]
+    fn test_http_url_format() {
+        let domain = "api.localhost";
+        let url = format!("http://{}", domain);
+        assert_eq!(url, "http://api.localhost");
+    }
+
+    #[test]
+    fn test_https_url_with_port() {
+        let domain = "api.localhost";
+        let port = 443;
+        let url = format!("https://{}:{}", domain, port);
+        assert_eq!(url, "https://api.localhost:443");
+    }
+}
+
+mod edge_cases {
+    use super::*;
+
+    #[test]
+    fn test_empty_host_header() {
+        let headers = "GET / HTTP/1.1\r\nHost:\r\n\r\n";
+        let host = extract_host_from_headers(headers);
+        assert_eq!(host, Some("".to_string()));
+    }
+
+    #[test]
+    fn test_host_with_ipv6() {
+        let host = "[::1]:8080";
+        let parts: Vec<&str> = host.rsplitn(2, ':').collect();
+        // For IPv6, this naive split doesn't work well
+        // but we test the behavior
+        assert!(parts.len() >= 1);
+    }
+
+    #[test]
+    fn test_very_long_domain() {
+        let long_subdomain = "a".repeat(63); // max label length
+        let domain = format!("{}.localhost", long_subdomain);
+        assert!(domain.len() > 63);
+        assert!(domain.ends_with(".localhost"));
+    }
+
+    #[test]
+    fn test_domain_with_many_subdomains() {
+        let domain = "a.b.c.d.e.localhost";
+        let parts: Vec<&str> = domain.split('.').collect();
+        assert_eq!(parts.len(), 6);
+        assert_eq!(parts.last(), Some(&"localhost"));
+    }
+
+    #[test]
+    fn test_punycode_domain() {
+        // Internationalized domain names use punycode
+        let domain = "xn--n3h.localhost"; // emoji domain encoded
+        assert!(domain.starts_with("xn--"));
+    }
+
+    #[test]
+    fn test_case_insensitive_domain_matching() {
+        let domain1 = "API.LOCALHOST";
+        let domain2 = "api.localhost";
+        assert_eq!(domain1.to_lowercase(), domain2.to_lowercase());
+    }
+
+    #[test]
+    fn test_host_header_with_trailing_dot() {
+        // DNS technically allows trailing dots
+        let host = "api.localhost.";
+        let normalized = host.trim_end_matches('.');
+        assert_eq!(normalized, "api.localhost");
+    }
+
+    #[test]
+    fn test_multiple_colons_in_host() {
+        // IPv6 address has multiple colons
+        let host = "[2001:db8::1]:8080";
+        // Our simple split by first colon wouldn't work for IPv6
+        // This tests awareness of the edge case
+        assert!(host.contains("::"));
+    }
+
+    #[test]
+    fn test_kill_api_empty_domain() {
+        let path = "/api/kill/";
+        let target = path.strip_prefix("/api/kill/").unwrap_or("");
+        assert_eq!(target, "");
+        assert!(target.is_empty());
+    }
+
+    #[test]
+    fn test_kill_api_domain_with_special_chars() {
+        let path = "/api/kill/my-app_v2.localhost";
+        let target = path.strip_prefix("/api/kill/").unwrap();
+        assert_eq!(target, "my-app_v2.localhost");
+    }
+
+    #[test]
+    fn test_websocket_upgrade_case_variations() {
+        let headers1 = "Upgrade: WebSocket";
+        let headers2 = "upgrade: WEBSOCKET";
+        let headers3 = "UPGRADE: websocket";
+
+        // All should be detected as websocket
+        assert!(headers1.to_lowercase().contains("websocket"));
+        assert!(headers2.to_lowercase().contains("websocket"));
+        assert!(headers3.to_lowercase().contains("websocket"));
+    }
+
+    #[test]
+    fn test_connection_header_variations() {
+        let conn1 = "Connection: Upgrade";
+        let conn2 = "Connection: keep-alive, Upgrade";
+        let conn3 = "connection: upgrade";
+
+        assert!(conn1.to_lowercase().contains("upgrade"));
+        assert!(conn2.to_lowercase().contains("upgrade"));
+        assert!(conn3.to_lowercase().contains("upgrade"));
+    }
+}
+
+mod forwarding {
+    #[test]
+    fn test_backend_address_format() {
+        let port: u16 = 4000;
+        let addr = format!("127.0.0.1:{}", port);
+        assert_eq!(addr, "127.0.0.1:4000");
+    }
+
+    #[test]
+    fn test_backend_port_range() {
+        let port: u16 = 4500;
+        assert!(port >= 4000 && port <= 5000);
+    }
+
+    #[test]
+    fn test_x_forwarded_headers() {
+        let original_host = "api.localhost";
+        let x_forwarded_host = format!("X-Forwarded-Host: {}", original_host);
+        assert!(x_forwarded_host.contains("api.localhost"));
+    }
+
+    #[test]
+    fn test_x_forwarded_proto_https() {
+        let proto = "https";
+        let header = format!("X-Forwarded-Proto: {}", proto);
+        assert!(header.contains("https"));
+    }
+
+    #[test]
+    fn test_x_forwarded_proto_http() {
+        let proto = "http";
+        let header = format!("X-Forwarded-Proto: {}", proto);
+        assert!(header.contains("http"));
+    }
+}

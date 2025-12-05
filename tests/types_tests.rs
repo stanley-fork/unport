@@ -28,6 +28,7 @@ enum Request {
         domain: String,
     },
     Shutdown,
+    HttpsStatus,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -36,6 +37,7 @@ enum Response {
     Port(u16),
     Services(Vec<Service>),
     Error(String),
+    HttpsEnabled(bool),
 }
 
 mod service_tests {
@@ -188,6 +190,20 @@ mod request_tests {
             _ => panic!("Expected Register request"),
         }
     }
+
+    #[test]
+    fn test_https_status_request() {
+        let req = Request::HttpsStatus;
+        let json = serde_json::to_string(&req).unwrap();
+        assert_eq!(json, "\"HttpsStatus\"");
+    }
+
+    #[test]
+    fn test_https_status_request_deserialize() {
+        let json = "\"HttpsStatus\"";
+        let req: Request = serde_json::from_str(json).unwrap();
+        assert_eq!(req, Request::HttpsStatus);
+    }
 }
 
 mod response_tests {
@@ -259,6 +275,41 @@ mod response_tests {
     #[test]
     fn test_response_roundtrip() {
         let resp = Response::Port(4500);
+        let json = serde_json::to_string(&resp).unwrap();
+        let deserialized: Response = serde_json::from_str(&json).unwrap();
+        assert_eq!(resp, deserialized);
+    }
+
+    #[test]
+    fn test_https_enabled_response_true() {
+        let resp = Response::HttpsEnabled(true);
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("HttpsEnabled"));
+        assert!(json.contains("true"));
+    }
+
+    #[test]
+    fn test_https_enabled_response_false() {
+        let resp = Response::HttpsEnabled(false);
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("HttpsEnabled"));
+        assert!(json.contains("false"));
+    }
+
+    #[test]
+    fn test_https_enabled_response_deserialize() {
+        let json = r#"{"HttpsEnabled":true}"#;
+        let resp: Response = serde_json::from_str(json).unwrap();
+        assert_eq!(resp, Response::HttpsEnabled(true));
+
+        let json = r#"{"HttpsEnabled":false}"#;
+        let resp: Response = serde_json::from_str(json).unwrap();
+        assert_eq!(resp, Response::HttpsEnabled(false));
+    }
+
+    #[test]
+    fn test_https_enabled_response_roundtrip() {
+        let resp = Response::HttpsEnabled(true);
         let json = serde_json::to_string(&resp).unwrap();
         let deserialized: Response = serde_json::from_str(&json).unwrap();
         assert_eq!(resp, deserialized);
