@@ -6,6 +6,15 @@
 
 Local development port manager. Access your apps via clean domains like `http://api.localhost` instead of `localhost:3847`.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [How It Works](#how-it-works)
+- [Commands](#commands)
+- [Config](#config)
+- [License](#license)
+
 ## Installation
 
 ```bash
