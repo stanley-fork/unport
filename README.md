@@ -1,11 +1,17 @@
-# unport
+<p align="center">
+  <img src="assets/banner.jpeg" alt="Unport - Local Port Management Daemon" width="100%">
+</p>
 
-[![Crates.io](https://img.shields.io/crates/v/unport-cli.svg)](https://crates.io/crates/unport-cli)
-[![Downloads](https://img.shields.io/crates/d/unport-cli.svg)](https://crates.io/crates/unport-cli)
-[![License](https://img.shields.io/crates/l/unport-cli.svg)](LICENSE)
-![Coverage](assets/coverage.svg)
+<p align="center">
+  <a href="https://crates.io/crates/unport-cli"><img src="https://img.shields.io/crates/v/unport-cli.svg" alt="Crates.io"></a>
+  <a href="https://crates.io/crates/unport-cli"><img src="https://img.shields.io/crates/d/unport-cli.svg" alt="Downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/crates/l/unport-cli.svg" alt="License"></a>
+  <img src="assets/coverage.svg" alt="Coverage">
+</p>
 
-Local development port manager. Access your apps via clean domains like `http://api.localhost` instead of `localhost:3847`.
+<p align="center">
+  Local development port manager. Access your apps via clean domains like <code>http://api.localhost</code> instead of <code>localhost:3847</code>.
+</p>
 
 ## Table of Contents
 
